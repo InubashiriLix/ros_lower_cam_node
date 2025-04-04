@@ -17,17 +17,19 @@ void LowCamNode::pub_timer_callback() {
 }
 
 LowCamNode::LowCamNode(const std::string& name) : Node(name) {
-    _low_cam_target_pub_ = this->create_publisher<geometry_msgs::msg::Point>(this->TOPIC_NAME, 10);
-    __pub_timer__ = this->create_wall_timer(10ms, std::bind(&LowCamNode::pub_timer_callback, this));
-
     // create the detect instance and open the camera
     _green_spot_detector_ = std::make_shared<lower_cam_detector::GreenSpotDetector>(0);
     int status_vision_start = _green_spot_detector_->start();
     // if open cam failed, abort
     if (status_vision_start != 0) {
         RCLCPP_ERROR(this->get_logger(), "Failed to start vision thread");
-        return;
+        _green_spot_detector_->stop();
+        throw std::runtime_error("Camera initialization failed");
     }
+
+    // NOTE: if the cam is not open, then the thread will not be started and publisher will not run
+    _low_cam_target_pub_ = this->create_publisher<geometry_msgs::msg::Point>(this->TOPIC_NAME, 10);
+    __pub_timer__ = this->create_wall_timer(10ms, std::bind(&LowCamNode::pub_timer_callback, this));
 
     // start the detect loop
     vision_thread =
